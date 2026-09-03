@@ -8,6 +8,7 @@
 #include <vector>
 
 namespace plt = matplot;
+int c = 1;
 
 // The circle is: 10 = (x - 2)^2 + y^2.
 // Rewriting it gives: (x - 2)^2 + y^2 = 10.

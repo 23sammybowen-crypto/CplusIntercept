@@ -1,0 +1,22 @@
+# CMake build output
+/build/
+/cmake-build-*/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+install_manifest.txt
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Compiled artifacts
+*.o
+*.obj
+*.a
+*.so
+*.dylib
