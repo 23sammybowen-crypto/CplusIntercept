@@ -1,56 +1,87 @@
 # CplusIntercept
 
-`CplusIntercept` is a small C++ program that uses the native C++ plotting
-library [Matplot++](https://github.com/alandefreitas/matplotplusplus).
+`CplusIntercept` is a C++17 OpenGL project built with CMake. The current
+program opens a GLFW window and renders a simple colored shape using modern
+OpenGL, GLAD, and GLM.
 
-It draws:
+## Dependencies
 
-- the circle `1 = (x + 4)^2 + y^2`;
-- horizontal lines `y = 0`, `y = 1`, and `y = 2`;
-- the leftmost intersection for each line that reaches the circle.
+CMake downloads the project libraries automatically on first configure:
 
-The circle has center `(-4, 0)` and radius `1`. Solving for the leftmost
-intersection gives:
+- GLFW for window creation and input
+- GLAD for loading OpenGL functions
+- GLM for vector and matrix math
 
-```text
-x = -4 - sqrt(1 - y^2)
-```
+You still need a C++ compiler, CMake, Git, and your platform's OpenGL
+development support.
 
-Therefore:
+## macOS
 
-```text
-y = 0  ->  (-5, 0)
-y = 1  ->  (-4, 1)
-y = 2  ->  no real intersection
-```
-
-Lines with an intersection are drawn only for `x <` that intersection. The
-intersection itself is shown as a red marker. Since `y = 2` never reaches the
-circle, it is shown as a dashed reference line across the graph.
-
-## Build and run
-
-On macOS, install the build tools once if needed:
+Install the command-line tools and CMake:
 
 ```bash
-brew install cmake gnuplot
+xcode-select --install
+brew install cmake git
 ```
 
-From this project directory:
+Build and run from the project root:
 
 ```bash
-cmake -S . -B build
-cmake --build build
-./build/CplusIntercept
+cmake -S . -B build-opengl
+cmake --build build-opengl
+./build-opengl/CplusIntercept
 ```
 
-The first CMake command downloads Matplot++ automatically if it is not already
-available. Matplot++ uses its Gnuplot backend by default, so install Gnuplot
-once if it is not already installed:
+Press `Esc` to close the window.
+
+## Windows
+
+Install:
+
+- Visual Studio 2022 with the "Desktop development with C++" workload
+- CMake
+- Git
+
+Then open PowerShell in the project root and run:
+
+```powershell
+cmake -S . -B build-opengl
+cmake --build build-opengl --config Debug
+.\build-opengl\Debug\CplusIntercept.exe
+```
+
+For a release build:
+
+```powershell
+cmake --build build-opengl --config Release
+.\build-opengl\Release\CplusIntercept.exe
+```
+
+Press `Esc` to close the window.
+
+## Linux
+
+On Ubuntu or Debian, install the compiler and OpenGL/X11 development packages:
 
 ```bash
-brew install gnuplot       # macOS
-# sudo apt install gnuplot # Ubuntu/Debian
+sudo apt update
+sudo apt install build-essential cmake git libgl1-mesa-dev xorg-dev
 ```
 
-A native plotting window will open when the program runs.
+Build and run from the project root:
+
+```bash
+cmake -S . -B build-opengl
+cmake --build build-opengl
+./build-opengl/CplusIntercept
+```
+
+Press `Esc` to close the window.
+
+## Notes
+
+The first `cmake -S . -B build-opengl` command requires internet access because
+CMake fetches GLFW, GLAD, and GLM from GitHub.
+
+If an older `build/` directory exists, prefer `build-opengl/` for this OpenGL
+version. That avoids stale CMake cache issues from earlier experiments.
