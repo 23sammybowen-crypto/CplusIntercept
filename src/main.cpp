@@ -83,27 +83,57 @@ int main() {
         return -1;
     }
 
+    //keep back from overlapping front
     glEnable(GL_DEPTH_TEST);
 
 
-    //After initializing, draw a simple triangle
+    // vertices: x, y, z, r, g, b.
+   
 
     float vertices[] = {
-        -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // left  
-         0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,  // right 
-         0.0f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f   // top   
+        -0.9f, -0.45f, -0.35f, 1.0f, 0.1f, 0.1f,
+         0.9f, -0.45f, -0.35f, 0.1f, 1.0f, 0.1f,
+         0.9f,  0.45f, -0.35f, 0.1f, 0.1f, 1.0f,
+        -0.9f,  0.45f, -0.35f, 1.0f, 1.0f, 0.1f,
+        -0.9f, -0.45f,  0.35f, 1.0f, 0.1f, 1.0f,
+         0.9f, -0.45f,  0.35f, 0.1f, 1.0f, 1.0f,
+         0.9f,  0.45f,  0.35f, 1.0f, 0.5f, 0.1f,
+        -0.9f,  0.45f,  0.35f, 0.6f, 0.3f, 1.0f
+    };
+
+    //makes faces of the cube using the vertices above
+    //rectangle = 2 triangles
+    //rectangular prism = 6 rectangles = 12 triangles
+    unsigned int indices[] = {
+        0, 1, 2,
+        2, 3, 0,
+        4, 5, 6,
+        6, 7, 4,
+        0, 4, 7,
+        7, 3, 0,
+        1, 5, 6,
+        6, 2, 1,
+        3, 2, 6,
+        6, 7, 3,
+        0, 1, 5,
+        5, 4, 0
     };
 
     unsigned int vao;
     unsigned int vbo;
+    unsigned int ebo;
 
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
 
     glBindVertexArray(vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
     glEnableVertexAttribArray(0);
@@ -153,6 +183,8 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(shaderProgram);
         glm::mat4 model = glm::mat4(1.0f);
+
+        //rotate the cube over time
         model = glm::rotate(
             model,
             static_cast<float>(glfwGetTime()),
@@ -192,7 +224,7 @@ int main() {
             glm::value_ptr(projection)
         );
         glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -202,6 +234,7 @@ int main() {
 //clean up gpu resources
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
+    glDeleteBuffers(1, &ebo);
     glDeleteProgram(shaderProgram);
 
     glfwDestroyWindow(window);
