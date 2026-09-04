@@ -134,11 +134,13 @@ int main() {
         glfwPollEvents();
     }
 
-    glfwDestroyWindow(window);
+    
 //clean up gpu resources
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
     glDeleteProgram(shaderProgram);
+
+    glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
 }
