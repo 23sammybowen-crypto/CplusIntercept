@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <vector>
+#include <cmath>
 
 void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -86,20 +88,40 @@ int main() {
     //keep back from overlapping front
     glEnable(GL_DEPTH_TEST);
 
+    // Define the parameters for the sphere
+    constexpr float radius = 0.75f;
+    constexpr int latitudeSegments = 32;
+    constexpr int longitudeSegments = 32;
+    constexpr float pi = 3.14159265359f;
 
-    // vertices: x, y, z, r, g, b.
-   
+    for(int lat - 0; lat <= latitudeSegments; ++lat) {
+        float latitude = pi * (static_cast<float>(lat) / latitudeSegments - 0.5f);
 
-    float vertices[] = {
-        -0.9f, -0.45f, -0.35f, 1.0f, 0.1f, 0.1f,
-         0.9f, -0.45f, -0.35f, 0.1f, 1.0f, 0.1f,
-         0.9f,  0.45f, -0.35f, 0.1f, 0.1f, 1.0f,
-        -0.9f,  0.45f, -0.35f, 1.0f, 1.0f, 0.1f,
-        -0.9f, -0.45f,  0.35f, 1.0f, 0.1f, 1.0f,
-         0.9f, -0.45f,  0.35f, 0.1f, 1.0f, 1.0f,
-         0.9f,  0.45f,  0.35f, 1.0f, 0.5f, 0.1f,
-        -0.9f,  0.45f,  0.35f, 0.6f, 0.3f, 1.0f
-    };
+        float y = radius * std::cos(latitude);
+        float ringRadius = radius * std::sin(latitude);
+
+        for(int lon = 0; lon <= longitudeSegments; ++lon) {
+            float longitude = 2.0f * pi * static_cast<float>(lon) / longitudeSegments;
+
+            float x = ringRadius * std::cos(longitude);
+            float z = ringRadius * std::sin(longitude);
+
+            float red = static_cast<float>(lat) / static_cast<float>(latitudeSegments);
+            float green = static_cast<float>(lon) / static_cast<float>(longitudeSegments);
+            float blue = 1.0f - red;
+
+            vertices.push_back(x);
+            vertices.push_back(y);
+            vertices.push_back(z);
+
+            vertices.push_back(red);
+            vertices.push_back(green);
+            vertices.push_back(blue);
+        }
+    }
+
+
+
 
     //makes faces of the cube using the vertices above
     //rectangle = 2 triangles
