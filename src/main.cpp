@@ -93,9 +93,10 @@ int main() {
     constexpr int latitudeSegments = 32;
     constexpr int longitudeSegments = 32;
     constexpr float pi = 3.14159265359f;
+    std::vector<float> vertices;
 
-    for(int lat - 0; lat <= latitudeSegments; ++lat) {
-        float latitude = pi * (static_cast<float>(lat) / latitudeSegments - 0.5f);
+    for(int lat = 0; lat <= latitudeSegments; ++lat) {
+        float latitude = pi * static_cast<float>(lat) / static_cast<float>(latitudeSegments);
 
         float y = radius * std::cos(latitude);
         float ringRadius = radius * std::sin(latitude);
@@ -123,23 +124,22 @@ int main() {
 
 
 
-    //makes faces of the cube using the vertices above
-    //rectangle = 2 triangles
-    //rectangular prism = 6 rectangles = 12 triangles
-    unsigned int indices[] = {
-        0, 1, 2,
-        2, 3, 0,
-        4, 5, 6,
-        6, 7, 4,
-        0, 4, 7,
-        7, 3, 0,
-        1, 5, 6,
-        6, 2, 1,
-        3, 2, 6,
-        6, 7, 3,
-        0, 1, 5,
-        5, 4, 0
-    };
+    std::vector<unsigned int> indices;
+
+    for(int lat = 0; lat < latitudeSegments; ++lat) {
+        for(int lon = 0; lon < longitudeSegments; ++lon) {
+            unsigned int current = (lat * (longitudeSegments + 1)) + lon;
+            unsigned int next = current + longitudeSegments + 1;
+
+            indices.push_back(current);
+            indices.push_back(next);
+            indices.push_back(current + 1);
+
+            indices.push_back(next);
+            indices.push_back(next + 1);
+            indices.push_back(current + 1);
+        }
+    }
 
     unsigned int vao;
     unsigned int vbo;
@@ -152,10 +152,10 @@ int main() {
     glBindVertexArray(vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
     glEnableVertexAttribArray(0);
@@ -246,7 +246,7 @@ int main() {
             glm::value_ptr(projection)
         );
         glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, nullptr);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
