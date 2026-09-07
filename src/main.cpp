@@ -179,6 +179,7 @@ int main() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
     glEnableVertexAttribArray(0);
 
+
     glVertexAttribPointer(
         1,
         3,
@@ -188,6 +189,42 @@ int main() {
         reinterpret_cast<void*>(3 * sizeof(float))
     );
 
+    glEnableVertexAttribArray(1);
+
+    //Line State Variables
+    glm::vec3 sphereCenter(0.0f, 0.0f, 0.0f);
+
+    glm::vec3 lineStart(-2.0f, 0.0f, 0.0f);
+    glm::vec3 lineEnd = lineStart;
+
+    float lineSpeed = 0.5f;
+    bool collided = false;
+
+    // Define the line vertices
+    float lineVertices[] = {
+        lineStart.x, lineStart.y, lineStart.z, 1.0f, 1.0f, 1.0f,
+        lineEnd.x, lineEnd.y, lineEnd.z, 1.0f, 0.2f, 0.2f
+    };
+
+    unsigned int lineVao, lineVbo;
+    glGenVertexArrays(1, &lineVao);
+    glGenBuffers(1, &lineVbo);
+
+    glBindVertexArray(lineVao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_DYNAMIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        1,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        6 * sizeof(float),
+        reinterpret_cast<void*>(3 * sizeof(float))
+    );
     glEnableVertexAttribArray(1);
 
     //Shader compilation and linking
@@ -222,6 +259,8 @@ int main() {
 
 
 
+
+
     //Render loop
 
 
@@ -232,6 +271,24 @@ int main() {
         lastFrameTime = currentFrameTime;
 
         processInput(window, rotationX, rotationY, deltaTime);
+
+        //Collision detection and line movement
+        if (!collided) {
+            lineEnd.x += lineSpeed * deltaTime;
+
+            if (lineEnd.x >= sphereCenter.x - radius) {
+                lineEnd.x = sphereCenter.x - radius;
+                collided = true;
+            }
+        }
+        // Update the line vertices with the new end position
+        float updatedLineVertices[] = {
+            lineStart.x, lineStart.y, lineStart.z, 1.0f, 1.0f, 1.0f,
+            lineEnd.x, lineEnd.y, lineEnd.z, 1.0f, 0.2f, 0.2f
+        };
+
+        glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(updatedLineVertices), updatedLineVertices);
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -251,6 +308,7 @@ int main() {
             0.1f,
             100.0f
         );
+    //Draw the sphere
 
         glUniformMatrix4fv(
             modelLocation,
@@ -275,6 +333,20 @@ int main() {
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, nullptr);
 
+        //Draw the line
+        glm::mat4 lineModel = glm::mat4(1.0f);
+        glUniformMatrix4fv(
+            modelLocation,
+            1,
+            GL_FALSE,
+            glm::value_ptr(lineModel)
+        );
+        glLineWidth(2.0f);
+
+
+        glBindVertexArray(lineVao);
+        glDrawArrays(GL_LINES, 0, 2);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -285,6 +357,8 @@ int main() {
     glDeleteBuffers(1, &vbo);
     glDeleteBuffers(1, &ebo);
     glDeleteProgram(shaderProgram);
+    glDeleteVertexArrays(1, &lineVao);
+    glDeleteBuffers(1, &lineVbo);
 
     glfwDestroyWindow(window);
     glfwTerminate();
