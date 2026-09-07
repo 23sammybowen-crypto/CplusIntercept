@@ -11,30 +11,27 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void processInput(GLFWwindow* window, glm::vec3& cameraPosition, float deltaTime) {
+void processInput(GLFWwindow* window, float& rotationX, float& rotationY, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
         glfwSetWindowShouldClose(window, true);
     }
 
-    const float cameraSpeed = 2.5f * deltaTime;
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        cameraPosition.x -= cameraSpeed;
+    const float rotationSpeed = 2.5f * deltaTime;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        rotationX += rotationSpeed;
     }
 
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        cameraPosition.x += cameraSpeed;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        rotationX -= rotationSpeed;
     }
 
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        cameraPosition.y += cameraSpeed;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        rotationY -= rotationSpeed;
     }
 
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        cameraPosition.y -= cameraSpeed;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        rotationY += rotationSpeed;
     }
 }
 
@@ -219,6 +216,8 @@ int main() {
     glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);
     glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);
 
+    float rotationX = 0.0f;
+    float rotationY = 0.0f;
     float lastFrameTime = 0.0f;
 
 
@@ -232,7 +231,7 @@ int main() {
         float deltaTime = currentFrameTime - lastFrameTime;
         lastFrameTime = currentFrameTime;
 
-        processInput(window, cameraPosition, deltaTime);
+        processInput(window, rotationX, rotationY, deltaTime);
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -241,12 +240,8 @@ int main() {
         
         glm::mat4 model = glm::mat4(1.0f);
 
-        //rotate the cube over time
-        model = glm::rotate(
-            model,
-            static_cast<float>(glfwGetTime()),
-            glm::vec3(0.5f, 1.0f, 0.0f)
-        );
+        model = glm::rotate(model, rotationX, glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, rotationY, glm::vec3(0.0f, 1.0f, 0.0f));
 
         glm::mat4 view = glm::lookAt(cameraPosition, cameraTarget, cameraUp);
 

@@ -1,7 +1,7 @@
 # CplusIntercept
 
 `CplusIntercept` is a C++17 OpenGL project built with CMake. The current
-program opens a GLFW window and renders a simple colored shape using modern
+program opens a GLFW window and renders a generated colored sphere using modern
 OpenGL, GLAD, and GLM.
 
 ## Dependencies
@@ -32,8 +32,6 @@ cmake --build build-opengl
 ./build-opengl/CplusIntercept
 ```
 
-Press `Esc` to close the window.
-
 ## Windows
 
 Install:
@@ -57,8 +55,6 @@ cmake --build build-opengl --config Release
 .\build-opengl\Release\CplusIntercept.exe
 ```
 
-Press `Esc` to close the window.
-
 ## Linux
 
 On Ubuntu or Debian, install the compiler and OpenGL/X11 development packages:
@@ -76,7 +72,13 @@ cmake --build build-opengl
 ./build-opengl/CplusIntercept
 ```
 
-Press `Esc` to close the window.
+## Controls
+
+- `W` rotates the sphere upward
+- `S` rotates the sphere downward
+- `A` rotates the sphere left
+- `D` rotates the sphere right
+- `Esc` closes the window
 
 ## Notes
 
