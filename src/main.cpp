@@ -11,9 +11,31 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void processInput(GLFWwindow* window) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+void processInput(GLFWwindow* window, glm::vec3& cameraPosition, float deltaTime) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
         glfwSetWindowShouldClose(window, true);
+    }
+
+    const float cameraSpeed = 2.5f * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        cameraPosition.x -= cameraSpeed;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        cameraPosition.x += cameraSpeed;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        cameraPosition.y += cameraSpeed;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        cameraPosition.y -= cameraSpeed;
+    }
 }
 
 const char* vertexShaderSource = R"(
@@ -171,6 +193,7 @@ int main() {
 
     glEnableVertexAttribArray(1);
 
+    //Shader compilation and linking
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
     glCompileShader(vertexShader);
@@ -191,6 +214,12 @@ int main() {
     int viewLocation = glGetUniformLocation(shaderProgram, "view");
     int projectionLocation = glGetUniformLocation(shaderProgram, "projection");
 
+    // Camera setup
+    glm::vec3 cameraPosition(0.0f, 0.0f, 3.0f);
+    glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);
+    glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);
+
+    float lastFrameTime = 0.0f;
 
 
 
@@ -199,11 +228,17 @@ int main() {
 
 
     while (!glfwWindowShouldClose(window)) {
-        processInput(window);
+        float currentFrameTime = static_cast<float>(glfwGetTime());
+        float deltaTime = currentFrameTime - lastFrameTime;
+        lastFrameTime = currentFrameTime;
+
+        processInput(window, cameraPosition, deltaTime);
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         glUseProgram(shaderProgram);
+        
         glm::mat4 model = glm::mat4(1.0f);
 
         //rotate the cube over time
@@ -213,10 +248,7 @@ int main() {
             glm::vec3(0.5f, 1.0f, 0.0f)
         );
 
-        glm::mat4 view = glm::translate(
-            glm::mat4(1.0f),
-            glm::vec3(0.0f, 0.0f, -3.0f)
-        );
+        glm::mat4 view = glm::lookAt(cameraPosition, cameraTarget, cameraUp);
 
         glm::mat4 projection = glm::perspective(
             glm::radians(45.0f),
