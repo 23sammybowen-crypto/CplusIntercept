@@ -6,6 +6,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -67,10 +68,59 @@ void main() {
 // Define a struct to hold the line's start and end points, as well as the time of collision
 struct CollisionLine {
     glm::vec3 start;
-    glm::vec3 end;
+    glm::vec3 position;
+    glm::vec3 velocity;
+
+    std::vector<glm::vec3> trail;
+
     float startTime;
     bool collided;
+    bool active;
+    bool escaped;
 };
+
+bool segmentHitsSphere(
+    const glm::vec3& start,
+    const glm::vec3& end,
+    const glm::vec3& sphereCenter,
+    float radius,
+    float& hitTime
+){
+    glm::vec3 direction = end - start;
+    glm::vec3 offset = start - sphereCenter;
+
+    float a = glm::dot(direction, direction);
+
+    if (a < 0.000001f) {
+        return false;
+    }
+
+    float b = 2.0f * glm::dot(offset, direction);
+    float c = glm::dot(offset, offset) - radius * radius;
+
+    float discriminant = b * b - 4.0f * a * c;
+
+    if (discriminant < 0.0f) {
+        return false;
+    }
+
+    float squareRoot = std::sqrt(discriminant);
+
+    float firstHit = (-b - squareRoot) / (2.0f * a);
+    float secondHit = (-b + squareRoot) / (2.0f * a);
+
+    if (firstHit >= 0.0f && firstHit <= 1.0f) {
+        hitTime = firstHit;
+        return true;
+    }
+
+    if (secondHit >= 0.0f && secondHit <= 1.0f) {
+        hitTime = secondHit;
+        return true;
+    }
+
+    return false;
+}
 
 
 int main() {
@@ -114,26 +164,43 @@ int main() {
     glEnable(GL_DEPTH_TEST);
 
     // Define the parameters for the sphere and the lines
+    // I had to add in some parameters to convert the real world values into the world space values, this is because the sphere is not at a 1:1 scale with the real world.
     constexpr float radius = 0.75f;
+    constexpr double gravitationalConstant = 6.67430e-11;
+    constexpr double earthMass = 5.972e24;
+    constexpr double earthRadiusMeters = 6.371e6;
+
+    constexpr double earthMu = gravitationalConstant * earthMass;
+    const double metersPerWorldUnit = earthRadiusMeters / static_cast<double>(radius);
+    const double muWorld = earthMu / (metersPerWorldUnit * metersPerWorldUnit * metersPerWorldUnit);
+    constexpr double initialVelocityMetersPerSecond = 8000.0;
+    float initialVelocityWorld = static_cast<float>(initialVelocityMetersPerSecond / metersPerWorldUnit);
+    const double visualTimeScale = 300.0;
+    constexpr double physicsStep = 0.25;
     constexpr int latitudeSegments = 32;
     constexpr int longitudeSegments = 32;
     constexpr float pi = 3.14159265359f;
     std::vector<float> vertices;
     std::vector<CollisionLine> lines;
-    constexpr int lineCount = 21;
+    constexpr int lineCount = 25;
     constexpr float lineInterval = 0.2f;
     constexpr float lineStartX = -2.0f;
-    constexpr float lineMaxX = 2.0f;
 
     for (int i = 0; i < lineCount; ++i) {
-        float y = -1.0f + static_cast<float>(i) * 0.1f;
+        float y = -1.5f + static_cast<float>(i) * 0.125f;
+        CollisionLine line;
+        line.start = glm::vec3(lineStartX, y, 0.0f);
+        line.position = line.start;
+        line.velocity = glm::vec3(initialVelocityWorld, 0.0f, 0.0f);
+        line.trail.push_back(line.start);
+        line.startTime = static_cast<float>(i) * 0.5f;
+        line.active = true;
+        line.collided = false;
+        line.escaped = false;
 
-        lines.push_back({
-            glm::vec3(lineStartX, y, 0.0f),
-            glm::vec3(lineStartX, y, 0.0f),
-            i * lineInterval,
-            false
-        });
+        lines.push_back(line);
+
+
     }
 
     for(int lat = 0; lat <= latitudeSegments; ++lat) {
@@ -215,7 +282,6 @@ int main() {
 
     // Collision settings for the growing lines.
     glm::vec3 sphereCenter(0.0f, 0.0f, 0.0f);
-    float lineSpeed = 0.5f;
 
     //Shader compilation and linking
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -246,6 +312,7 @@ int main() {
     float rotationX = 0.0f;
     float rotationY = 0.0f;
     float lastFrameTime = 0.0f;
+    double physicsAccumulator = 0.0;
 
     // Create a separate VAO and VBO for the line
     unsigned int lineVao;
@@ -288,64 +355,86 @@ int main() {
 
         processInput(window, rotationX, rotationY, deltaTime);
 
-        std::vector<float> lineVertices;
-        lineVertices.reserve(lines.size() * 2 * 6);
+        double limitedDeltaTime =
+            std::min(
+                static_cast<double>(deltaTime),
+                0.05
+            );
 
-        for (CollisionLine& line : lines) {
-            if (currentFrameTime < line.startTime) {
-                continue;
-            }
+        physicsAccumulator +=
+            limitedDeltaTime * visualTimeScale;
 
-            if (!line.collided) {
-                float yOffset = line.start.y - sphereCenter.y;
-                float inside = radius * radius - yOffset * yOffset;
+        while (physicsAccumulator >= physicsStep) {
+            for (CollisionLine& line : lines) {
+                if (currentFrameTime < line.startTime) {
+                    continue;
+                }
 
-                if (inside >= 0.0f) {
-                    float hitX = sphereCenter.x - std::sqrt(inside);
+                if (!line.active) {
+                    continue;
+                }
 
-                    line.end.x += lineSpeed * deltaTime;
+                glm::vec3 previousPosition =
+                    line.position;
 
-                    if (line.end.x >= hitX) {
-                        line.end.x = hitX;
-                        line.collided = true;
-                    }
+                glm::vec3 offset =
+                    line.position - sphereCenter;
+
+                float distance =
+                    glm::length(offset);
+
+                if (distance <= radius) {
+                    line.collided = true;
+                    line.active = false;
+                    continue;
+                }
+
+                glm::vec3 acceleration =
+                    static_cast<float>(-muWorld) *
+                    offset /
+                    (distance * distance * distance);
+
+                float step =
+                    static_cast<float>(physicsStep);
+
+                line.velocity += acceleration * step;
+
+                glm::vec3 nextPosition =
+                    line.position + line.velocity * step;
+
+                float hitTime = 0.0f;
+
+                if (segmentHitsSphere(
+                        previousPosition,
+                        nextPosition,
+                        sphereCenter,
+                        radius,
+                        hitTime)) {
+
+                    line.position =
+                        previousPosition +
+                        (nextPosition - previousPosition)
+                        * hitTime;
+
+                    line.trail.push_back(line.position);
+
+                    line.collided = true;
+                    line.active = false;
                 } else {
-                    line.end.x += lineSpeed * deltaTime;
+                    line.position = nextPosition;
+                    line.trail.push_back(line.position);
 
-                    if (line.end.x >= lineMaxX) {
-                        line.end.x = lineMaxX;
-                        line.collided = true;
+                    if (glm::length(
+                            line.position - sphereCenter
+                        ) > 8.0f) {
+
+                        line.escaped = true;
+                        line.active = false;
                     }
                 }
             }
 
-            float red = line.collided ? 0.2f : 1.0f;
-            float green = line.collided ? 1.0f : 0.2f;
-            float blue = 0.2f;
-
-            lineVertices.push_back(line.start.x);
-            lineVertices.push_back(line.start.y);
-            lineVertices.push_back(line.start.z);
-            lineVertices.push_back(1.0f);
-            lineVertices.push_back(1.0f);
-            lineVertices.push_back(1.0f);
-
-            lineVertices.push_back(line.end.x);
-            lineVertices.push_back(line.end.y);
-            lineVertices.push_back(line.end.z);
-            lineVertices.push_back(red);
-            lineVertices.push_back(green);
-            lineVertices.push_back(blue);
-        }
-
-        glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
-        if (!lineVertices.empty()) {
-            glBufferSubData(
-                GL_ARRAY_BUFFER,
-                0,
-                lineVertices.size() * sizeof(float),
-                lineVertices.data()
-            );
+            physicsAccumulator -= physicsStep;
         }
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -391,17 +480,64 @@ int main() {
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, nullptr);
 
-        //Draw the line
-        glm::mat4 lineModel = glm::mat4(1.0f);
-        glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(lineModel));
-
-        
+        // Draw the curved line trails.
         glBindVertexArray(lineVao);
-        glDrawArrays(
-            GL_LINES,
-            0,
-            static_cast<GLsizei>(lineVertices.size() / 6)
+        glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
+
+        glm::mat4 lineModel = model;
+        glUniformMatrix4fv(
+            modelLocation,
+            1,
+            GL_FALSE,
+            glm::value_ptr(lineModel)
         );
+
+        glLineWidth(2.0f);
+
+        for (const CollisionLine& line : lines) {
+            if (currentFrameTime < line.startTime) {
+                continue;
+            }
+
+            if (line.trail.size() < 2) {
+                continue;
+            }
+
+            std::vector<float> trailVertices;
+
+            for (const glm::vec3& point : line.trail) {
+                trailVertices.push_back(point.x);
+                trailVertices.push_back(point.y);
+                trailVertices.push_back(point.z);
+
+                if (line.collided) {
+                    trailVertices.push_back(0.2f);
+                    trailVertices.push_back(1.0f);
+                    trailVertices.push_back(0.2f);
+                } else if (line.escaped) {
+                    trailVertices.push_back(0.2f);
+                    trailVertices.push_back(0.4f);
+                    trailVertices.push_back(1.0f);
+                } else {
+                    trailVertices.push_back(1.0f);
+                    trailVertices.push_back(0.2f);
+                    trailVertices.push_back(0.2f);
+                }
+            }
+
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                trailVertices.size() * sizeof(float),
+                trailVertices.data(),
+                GL_DYNAMIC_DRAW
+            );
+
+            glDrawArrays(
+                GL_LINE_STRIP,
+                0,
+                static_cast<GLsizei>(line.trail.size())
+            );
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
