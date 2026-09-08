@@ -64,7 +64,13 @@ void main() {
     FragColor = vec4(vertexColor, 1.0);
 }
 )";
-
+// Define a struct to hold the line's start and end points, as well as the time of collision
+struct CollisionLine {
+    glm::vec3 start;
+    glm::vec3 end;
+    float startTime;
+    bool collided;
+};
 
 
 int main() {
@@ -113,6 +119,21 @@ int main() {
     constexpr int longitudeSegments = 32;
     constexpr float pi = 3.14159265359f;
     std::vector<float> vertices;
+    std::vector<CollisionLine> lines;
+    constexpr int lineCount = 15;
+    constexpr float lineInterval = 0.2f;
+    constexpr float lineStartX = -2.0f;
+
+    for (int i = 0; i < lineCount; ++i) {
+        float y = -0.7f + static_cast<float>(i) * 0.1f;
+
+        lines.push_back({
+            glm::vec3(lineStartX, y, 0.0f),
+            glm::vec3(lineStartX, y, 0.0f),
+            i * lineInterval,
+            false
+        });
+    }
 
     for(int lat = 0; lat <= latitudeSegments; ++lat) {
         float latitude = pi * static_cast<float>(lat) / static_cast<float>(latitudeSegments);
@@ -191,41 +212,9 @@ int main() {
 
     glEnableVertexAttribArray(1);
 
-    //Line State Variables
+    // Collision settings for the growing lines.
     glm::vec3 sphereCenter(0.0f, 0.0f, 0.0f);
-
-    glm::vec3 lineStart(-2.0f, 0.0f, 0.0f);
-    glm::vec3 lineEnd = lineStart;
-
     float lineSpeed = 0.5f;
-    bool collided = false;
-
-    // Define the line vertices
-    float lineVertices[] = {
-        lineStart.x, lineStart.y, lineStart.z, 1.0f, 1.0f, 1.0f,
-        lineEnd.x, lineEnd.y, lineEnd.z, 1.0f, 0.2f, 0.2f
-    };
-
-    unsigned int lineVao, lineVbo;
-    glGenVertexArrays(1, &lineVao);
-    glGenBuffers(1, &lineVbo);
-
-    glBindVertexArray(lineVao);
-
-    glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_DYNAMIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(
-        1,
-        3,
-        GL_FLOAT,
-        GL_FALSE,
-        6 * sizeof(float),
-        reinterpret_cast<void*>(3 * sizeof(float))
-    );
-    glEnableVertexAttribArray(1);
 
     //Shader compilation and linking
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -257,9 +246,35 @@ int main() {
     float rotationY = 0.0f;
     float lastFrameTime = 0.0f;
 
+    // Create a separate VAO and VBO for the line
+    unsigned int lineVao;
+    unsigned int lineVbo;
 
+    glGenVertexArrays(1, &lineVao);
+    glGenBuffers(1, &lineVbo);
 
+    glBindVertexArray(lineVao);
+    glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
 
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        lineCount * 2 * 6 * sizeof(float),
+        nullptr,
+        GL_DYNAMIC_DRAW
+    );
+
+    // Set vertex attribute pointers
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        1,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        6 * sizeof(float),
+        reinterpret_cast<void*>(3 * sizeof(float))
+    );
+    glEnableVertexAttribArray(1);
 
     //Render loop
 
@@ -272,23 +287,60 @@ int main() {
 
         processInput(window, rotationX, rotationY, deltaTime);
 
-        //Collision detection and line movement
-        if (!collided) {
-            lineEnd.x += lineSpeed * deltaTime;
+        std::vector<float> lineVertices;
+        lineVertices.reserve(lines.size() * 2 * 6);
 
-            if (lineEnd.x >= sphereCenter.x - radius) {
-                lineEnd.x = sphereCenter.x - radius;
-                collided = true;
+        for (CollisionLine& line : lines) {
+            if (currentFrameTime < line.startTime) {
+                continue;
             }
+
+            if (!line.collided) {
+                float yOffset = line.start.y - sphereCenter.y;
+                float inside = radius * radius - yOffset * yOffset;
+
+                if (inside >= 0.0f) {
+                    float hitX = sphereCenter.x - std::sqrt(inside);
+
+                    line.end.x += lineSpeed * deltaTime;
+
+                    if (line.end.x >= hitX) {
+                        line.end.x = hitX;
+                        line.collided = true;
+                    }
+                } else {
+                    line.end.x += lineSpeed * deltaTime;
+                }
+            }
+
+            float red = line.collided ? 0.2f : 1.0f;
+            float green = line.collided ? 1.0f : 0.2f;
+            float blue = 0.2f;
+
+            lineVertices.push_back(line.start.x);
+            lineVertices.push_back(line.start.y);
+            lineVertices.push_back(line.start.z);
+            lineVertices.push_back(1.0f);
+            lineVertices.push_back(1.0f);
+            lineVertices.push_back(1.0f);
+
+            lineVertices.push_back(line.end.x);
+            lineVertices.push_back(line.end.y);
+            lineVertices.push_back(line.end.z);
+            lineVertices.push_back(red);
+            lineVertices.push_back(green);
+            lineVertices.push_back(blue);
         }
-        // Update the line vertices with the new end position
-        float updatedLineVertices[] = {
-            lineStart.x, lineStart.y, lineStart.z, 1.0f, 1.0f, 1.0f,
-            lineEnd.x, lineEnd.y, lineEnd.z, 1.0f, 0.2f, 0.2f
-        };
 
         glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(updatedLineVertices), updatedLineVertices);
+        if (!lineVertices.empty()) {
+            glBufferSubData(
+                GL_ARRAY_BUFFER,
+                0,
+                lineVertices.size() * sizeof(float),
+                lineVertices.data()
+            );
+        }
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -335,17 +387,15 @@ int main() {
 
         //Draw the line
         glm::mat4 lineModel = glm::mat4(1.0f);
-        glUniformMatrix4fv(
-            modelLocation,
-            1,
-            GL_FALSE,
-            glm::value_ptr(lineModel)
-        );
-        glLineWidth(2.0f);
+        glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(lineModel));
 
-
+        
         glBindVertexArray(lineVao);
-        glDrawArrays(GL_LINES, 0, 2);
+        glDrawArrays(
+            GL_LINES,
+            0,
+            static_cast<GLsizei>(lineVertices.size() / 6)
+        );
 
         glfwSwapBuffers(window);
         glfwPollEvents();
