@@ -113,19 +113,20 @@ int main() {
     //keep back from overlapping front
     glEnable(GL_DEPTH_TEST);
 
-    // Define the parameters for the sphere
+    // Define the parameters for the sphere and the lines
     constexpr float radius = 0.75f;
     constexpr int latitudeSegments = 32;
     constexpr int longitudeSegments = 32;
     constexpr float pi = 3.14159265359f;
     std::vector<float> vertices;
     std::vector<CollisionLine> lines;
-    constexpr int lineCount = 15;
+    constexpr int lineCount = 21;
     constexpr float lineInterval = 0.2f;
     constexpr float lineStartX = -2.0f;
+    constexpr float lineMaxX = 2.0f;
 
     for (int i = 0; i < lineCount; ++i) {
-        float y = -0.7f + static_cast<float>(i) * 0.1f;
+        float y = -1.0f + static_cast<float>(i) * 0.1f;
 
         lines.push_back({
             glm::vec3(lineStartX, y, 0.0f),
@@ -310,6 +311,11 @@ int main() {
                     }
                 } else {
                     line.end.x += lineSpeed * deltaTime;
+
+                    if (line.end.x >= lineMaxX) {
+                        line.end.x = lineMaxX;
+                        line.collided = true;
+                    }
                 }
             }
 
