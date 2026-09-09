@@ -1,8 +1,6 @@
 # CplusIntercept
 
-`CplusIntercept` is a C++17 OpenGL project built with CMake. The current
-program opens a GLFW window and renders a generated colored sphere using modern
-OpenGL, GLAD, and GLM.
+`CplusIntercept` is a C++17 OpenGL project built with CMake. The current program opens a GLFW window and renders a generated colored sphere using modern OpenGL, GLAD, and GLM. The sphere will have lines that will interact with the sphere as if they are objects with a velocity > 25000 mph and the sphere has the mass of the earth. This is a project to help myself learn more about c++ and rendering.
 
 ## Dependencies
 
