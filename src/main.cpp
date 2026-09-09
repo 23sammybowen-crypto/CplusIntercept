@@ -130,6 +130,7 @@ struct ClickLaunchContext {
     glm::mat4 inverseMvp;
     glm::vec3 sphereCenter;
     float launchPlaneZ;
+    float lineStartX;
     float initialVelocityWorld;
 };
 
@@ -180,23 +181,33 @@ void mouseButtonCallback(
     glm::vec3 rayStart = glm::vec3(nearPoint);
     glm::vec3 rayDirection = glm::normalize(glm::vec3(farPoint) - rayStart);
 
-    //Put the new line on a plane in front of the sphere
+    // Convert the click into a point on the simulation's z = 0 plane.
+    // The point chooses the line's height; every new line starts left and
+    // moves right, just like the original generated lines.
     if (std::abs(rayDirection.z) < 0.0001f) {
         return;
     }
 
-    float distanceToLaunchPlane = (context->launchPlaneZ - rayStart.z) / rayDirection.z;
+    float distanceToLaunchPlane =
+        (context->launchPlaneZ - rayStart.z) / rayDirection.z;
 
     if (distanceToLaunchPlane < 0.0f) {
         return;
     }
 
-    glm::vec3 launchPosition = rayStart + rayDirection * distanceToLaunchPlane;
+    glm::vec3 launchPosition =
+        rayStart + rayDirection * distanceToLaunchPlane;
+
+    launchPosition.x = context->lineStartX;
 
     CollisionLine line;
     line.start = launchPosition;
     line.position = launchPosition;
-    line.velocity = glm::vec3(context->initialVelocityWorld, 0.0f, 0.0f);
+    line.velocity = glm::vec3(
+        context->initialVelocityWorld,
+        0.0f,
+        0.0f
+    );
     line.trail.push_back(launchPosition);
     line.startTime = static_cast<float>(glfwGetTime());
     line.active = true;
@@ -403,7 +414,8 @@ int main() {
     clickContext.lines = &lines;
     clickContext.sphereCenter = sphereCenter;
     clickContext.inverseMvp = glm::mat4(1.0f);
-    clickContext.launchPlaneZ = 1.5f;
+    clickContext.launchPlaneZ = 0.0f;
+    clickContext.lineStartX = lineStartX;
     clickContext.initialVelocityWorld = initialVelocityWorld;
 
     glfwSetWindowUserPointer(window, &clickContext);
