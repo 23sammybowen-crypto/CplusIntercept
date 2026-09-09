@@ -7,6 +7,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <glm/gtc/matrix_inverse.hpp>
 
 void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -79,6 +80,8 @@ struct CollisionLine {
     bool escaped;
 };
 
+// Function to check if a line segment intersects with a sphere
+
 bool segmentHitsSphere(
     const glm::vec3& start,
     const glm::vec3& end,
@@ -122,6 +125,86 @@ bool segmentHitsSphere(
     return false;
 }
 
+struct ClickLaunchContext {
+    std::vector<CollisionLine>* lines;
+    glm::mat4 inverseMvp;
+    glm::vec3 sphereCenter;
+    float launchPlaneZ;
+    float initialVelocityWorld;
+};
+
+void mouseButtonCallback(
+    GLFWwindow* window,
+    int button,
+    int action,
+    int mods
+){
+    if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS) {
+        return;
+    }
+
+    auto* context = reinterpret_cast<ClickLaunchContext*>(glfwGetWindowUserPointer(window));
+
+    if (context == nullptr) {
+        return;
+    }
+
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+
+    int windowWidth, windowHeight;
+    int framebufferWidth, framebufferHeight;
+
+    glfwGetWindowSize(window, &windowWidth, &windowHeight);
+    glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+
+    if (windowWidth == 0 || windowHeight == 0 || framebufferWidth == 0 || framebufferHeight == 0) {
+        return;
+    }
+
+    //Convert the mouse position into framebuffer pixels
+
+    mouseX *= static_cast<double>(framebufferWidth) / windowWidth;
+    mouseY *= static_cast<double>(framebufferHeight) / windowHeight;
+
+    //Convert pixels into OpenGl normalized device coordinates
+    float ndcX = static_cast<float>((2.0 * mouseX) / framebufferWidth - 1.0);
+    float ndcY = static_cast<float>(1.0 - (2.0 * mouseY) / framebufferHeight);
+
+    glm::vec4 nearPoint = context->inverseMvp * glm::vec4(ndcX, ndcY, -1.0f, 1.0f);
+    glm::vec4 farPoint = context->inverseMvp * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
+
+    nearPoint /= nearPoint.w;
+    farPoint /= farPoint.w;
+
+    glm::vec3 rayStart = glm::vec3(nearPoint);
+    glm::vec3 rayDirection = glm::normalize(glm::vec3(farPoint) - rayStart);
+
+    //Put the new line on a plane in front of the sphere
+    if (std::abs(rayDirection.z) < 0.0001f) {
+        return;
+    }
+
+    float distanceToLaunchPlane = (context->launchPlaneZ - rayStart.z) / rayDirection.z;
+
+    if (distanceToLaunchPlane < 0.0f) {
+        return;
+    }
+
+    glm::vec3 launchPosition = rayStart + rayDirection * distanceToLaunchPlane;
+
+    CollisionLine line;
+    line.start = launchPosition;
+    line.position = launchPosition;
+    line.velocity = glm::vec3(context->initialVelocityWorld, 0.0f, 0.0f);
+    line.trail.push_back(launchPosition);
+    line.startTime = static_cast<float>(glfwGetTime());
+    line.active = true;
+    line.collided = false;
+    line.escaped = false;
+
+    context->lines->push_back(line);
+}
 
 int main() {
 
@@ -314,6 +397,18 @@ int main() {
     float lastFrameTime = 0.0f;
     double physicsAccumulator = 0.0;
 
+
+    // Set up the mouse click callback to launch lines
+    ClickLaunchContext clickContext;
+    clickContext.lines = &lines;
+    clickContext.sphereCenter = sphereCenter;
+    clickContext.inverseMvp = glm::mat4(1.0f);
+    clickContext.launchPlaneZ = 1.5f;
+    clickContext.initialVelocityWorld = initialVelocityWorld;
+
+    glfwSetWindowUserPointer(window, &clickContext);
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
+
     // Create a separate VAO and VBO for the line
     unsigned int lineVao;
     unsigned int lineVbo;
@@ -449,9 +544,13 @@ int main() {
 
         glm::mat4 view = glm::lookAt(cameraPosition, cameraTarget, cameraUp);
 
+        // Get the framebuffer size to calculate the aspect ratio for the projection matrix
+        int framebufferWidth, framebufferHeight;
+        glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+
         glm::mat4 projection = glm::perspective(
             glm::radians(45.0f),
-            800.0f / 600.0f,
+            static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
             0.1f,
             100.0f
         );
@@ -538,6 +637,10 @@ int main() {
                 static_cast<GLsizei>(line.trail.size())
             );
         }
+
+        clickContext.inverseMvp = glm::inverse(
+            projection * view * model
+        );
 
         glfwSwapBuffers(window);
         glfwPollEvents();
